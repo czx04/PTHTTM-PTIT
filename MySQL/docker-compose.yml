@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  mysql:
+    container_name: mysql-pthttm
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "3320:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/conf:/etc/mysql/conf.d
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: pthttm
+      MYSQL_ROOT_HOST: "%"
+    networks:
+      - mysql-network
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  mysql-network:
+    driver: bridge

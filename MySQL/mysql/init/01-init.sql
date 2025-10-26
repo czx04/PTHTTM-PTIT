@@ -1,0 +1,91 @@
+-- Tạo database đúng tên trong docker-compose
+-- DROP DATABASE IF EXISTS PTHTTM;
+
+
+-- CREATE DATABASE PTHTTM CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+-- USE PTHTTM;
+
+
+--
+-- CREATE TABLE Users (
+--     id VARCHAR(10) PRIMARY KEY,
+--     username VARCHAR(10) UNIQUE NOT NULL,
+--     hashed_password VARCHAR(255) NOT NULL,
+--     phone VARCHAR(250)
+-- );
+--
+-- CREATE TABLE AI (
+--     id VARCHAR(10) PRIMARY KEY,
+--     name VARCHAR(10) NOT NULL,
+--     description VARCHAR(10)
+-- );
+--
+-- CREATE TABLE ChatRoom (
+--     id VARCHAR(10) PRIMARY KEY,
+--     type VARCHAR(10) NOT NULL,
+--     create_at TIMESTAMP NOT NULL,
+--     timestamp TIMESTAMP,
+--     is_active INTEGER(10)
+-- );
+--
+-- CREATE TABLE ChatParticipants (
+--     id VARCHAR(10) PRIMARY KEY,
+--     join_at TIMESTAMP NOT NULL,
+--     last_seen TIMESTAMP,
+--     user_id VARCHAR(10) NOT NULL,
+--     chat_room_id VARCHAR(10) NOT NULL,
+--     FOREIGN KEY (user_id) REFERENCES Users(id),
+--     FOREIGN KEY (chat_room_id) REFERENCES ChatRoom(id)
+-- );
+--
+-- CREATE TABLE Messages (
+--     id VARCHAR(10) PRIMARY KEY,
+--     content VARCHAR(255) NOT NULL,
+--     sent_at TIMESTAMP NOT NULL,
+--     timestamp TIMESTAMP,
+--     sender_id VARCHAR(10) NOT NULL,
+--     chat_room_id VARCHAR(10) NOT NULL,
+--     is_read INTEGER(10),
+--     FOREIGN KEY (sender_id) REFERENCES Users(id),
+--     FOREIGN KEY (chat_room_id) REFERENCES ChatRoom(id)
+-- );
+--
+-- CREATE TABLE Matches (
+--     id INTEGER PRIMARY KEY AUTO_INCREMENT,
+--     type VARCHAR(10) NOT NULL,
+--     start_at INTEGER(10) NOT NULL,
+--     end_at INTEGER(10),
+--     status INTEGER(10)
+-- );
+--
+-- CREATE TABLE PvPMatches (
+--     id INTEGER PRIMARY KEY AUTO_INCREMENT,
+--     winner INTEGER(10),
+--     player1_id VARCHAR(10) NOT NULL,
+--     player2_id VARCHAR(10) NOT NULL,
+--     match_id INTEGER NOT NULL UNIQUE,
+--     FOREIGN KEY (player1_id) REFERENCES Users(id),
+--     FOREIGN KEY (player2_id) REFERENCES Users(id),
+--     FOREIGN KEY (match_id) REFERENCES Matches(id)
+-- );
+--
+-- CREATE TABLE PvEMatches (
+--     id INTEGER PRIMARY KEY AUTO_INCREMENT,
+--     winner INTEGER(10),
+--     ai_id VARCHAR(10) NOT NULL,
+--     player_id VARCHAR(10) NOT NULL,
+--     match_id INTEGER NOT NULL UNIQUE,
+--     FOREIGN KEY (ai_id) REFERENCES AI(id),
+--     FOREIGN KEY (player_id) REFERENCES Users(id),
+--     FOREIGN KEY (match_id) REFERENCES Matches(id)
+-- );
+--
+-- CREATE TABLE BoardStates (
+--     id INTEGER PRIMARY KEY AUTO_INCREMENT,
+--     board_data INTEGER(10) NOT NULL,
+--     save_at INTEGER(10) NOT NULL,
+--     match_id INTEGER NOT NULL,
+--     MatchesId INTEGER NOT NULL,
+--     FOREIGN KEY (match_id) REFERENCES Matches(id),
+--     FOREIGN KEY (MatchesId) REFERENCES Matches(id)
+-- );

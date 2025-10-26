@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyi
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+
+# Virtualenv
+venv/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDEs
+.idea/
+.vscode/
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# Environment files
+.env
+
+# Docker / MySQL data
+/MySQL/mysql/data/
+
+# Client build
+/CLIENT/dist/
+
+# Other
+.coverage
+.pytest_cache/
