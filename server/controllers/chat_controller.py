@@ -29,6 +29,7 @@ class ChatController:
         self.router.add_api_route("/rooms", self.create_room, methods=["POST"])
         self.router.add_api_route("/rooms", self.get_my_rooms, methods=["GET"])
         self.router.add_api_route("/rooms/{room_id}/messages", self.get_room_messages, methods=["GET"])
+        self.router.add_api_route("/rooms/{room_id}/participants", self.get_room_participants, methods=["GET"])
         self.router.add_api_route("/alias", self.set_alias, methods=["POST"])
         self.router.add_api_route("/alias/{user_id}", self.get_alias, methods=["GET"])
         self.router.add_api_route("/users", self.get_all_users, methods=["GET"])
@@ -293,6 +294,37 @@ class ChatController:
             }
             for user in users if user.id != user_id  # Không trả về chính mình
         ]
+    
+    async def get_room_participants(
+        self,
+        room_id: str,
+        authorization: Optional[str] = Header(None)
+    ):
+        """
+        Lấy danh sách participants của room
+        """
+        user_id = self._verify_token(authorization)
+        
+        # Kiểm tra user có trong room không
+        participants = chat_participant_dao.get_by_room(room_id)
+        
+        if not any(p.user_id == user_id for p in participants):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not a member of this room"
+            )
+        
+        # Trả về danh sách participants với thông tin user
+        result = []
+        for p in participants:
+            user = user_dao.get_by_id(p.user_id)
+            if user:
+                result.append({
+                    "user_id": user.id,
+                    "username": user.username
+                })
+        
+        return result
 
 
 # Khởi tạo controller

@@ -190,7 +190,31 @@
               <!-- Chat Area -->
               <div class="chat-main">
                 <div class="chat-main-header" id="chat-main-header">
-                  <h3 id="current-room-name">Chọn một phòng chat</h3>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 12px;
+                      flex: 1;
+                    "
+                  >
+                    <h3 id="current-room-name" style="margin: 0">
+                      Chọn một phòng chat
+                    </h3>
+                    <button
+                      id="edit-alias-btn"
+                      class="btn-secondary"
+                      style="
+                        display: none;
+                        padding: 5px 12px;
+                        font-size: 0.85rem;
+                        cursor: pointer;
+                      "
+                      title="Sửa biệt danh"
+                    >
+                      ✏️ Sửa biệt danh
+                    </button>
+                  </div>
                   <span class="typing-indicator" id="typing-indicator"></span>
                 </div>
 

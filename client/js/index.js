@@ -285,6 +285,9 @@ class ChatManager {
     constructor() {
         this.ws = null;
         this.currentRoomId = null;
+        this.currentRoomType = null;
+        this.otherUserId = null;
+        this.otherUserName = null;
         this.rooms = [];
         this.typingTimeout = null;
         
@@ -294,6 +297,7 @@ class ChatManager {
         this.sendBtn = document.getElementById('send-message-btn');
         this.currentRoomNameElement = document.getElementById('current-room-name');
         this.typingIndicator = document.getElementById('typing-indicator');
+        this.editAliasBtn = document.getElementById('edit-alias-btn');
         
         this.setupEventListeners();
         this.connectWebSocket();
@@ -308,6 +312,15 @@ class ChatManager {
                 this.sendMessage();
             }
         });
+        
+        // Edit alias button
+        if (this.editAliasBtn) {
+            this.editAliasBtn.addEventListener('click', () => {
+                if (this.otherUserId && this.otherUserName) {
+                    this.editAlias();
+                }
+            });
+        }
         
         // Typing indicator
         this.chatInput.addEventListener('input', () => {
@@ -348,7 +361,7 @@ class ChatManager {
         };
     }
     
-    handleWebSocketMessage(data) {
+    async handleWebSocketMessage(data) {
         switch(data.type) {
             case 'connected':
                 console.log('Connected to chat');
@@ -358,10 +371,10 @@ class ChatManager {
                 console.log('New room created:', data.room);
                 // Thêm room mới vào đầu danh sách
                 this.rooms.unshift(data.room);
-                this.renderRoomList();
+                await this.renderRoomList();
                 // Tự động chọn room mới (chỉ nếu user hiện tại là người tạo)
                 if (data.creator_id === currentUser.id) {
-                    this.selectRoom(data.room.id, data.room.name);
+                    this.selectRoom(data.room.id, data.room.name, data.room.type);
                 }
                 break;
                 
@@ -420,7 +433,7 @@ class ChatManager {
         }
     }
     
-    renderRoomList() {
+    async renderRoomList() {
         if (this.rooms.length === 0) {
             this.roomListElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Chưa có phòng chat nào</p>';
             return;
@@ -428,7 +441,42 @@ class ChatManager {
         
         this.roomListElement.innerHTML = '';
         
-        this.rooms.forEach(room => {
+        // Fetch aliases for direct chats
+        for (const room of this.rooms) {
+            let displayName = room.name;
+            
+            if (room.type === 'direct') {
+                // Fetch participants to get other user's ID
+                try {
+                    const response = await fetch(`${CHAT_API_URL}/rooms/${room.id}/participants`, {
+                        headers: {
+                            'Authorization': `Bearer ${currentToken}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const participants = await response.json();
+                        const otherUser = participants.find(p => p.user_id !== currentUser.id);
+                        
+                        if (otherUser) {
+                            // Fetch alias
+                            const aliasResponse = await fetch(`${CHAT_API_URL}/alias/${otherUser.user_id}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${currentToken}`
+                                }
+                            });
+                            
+                            if (aliasResponse.ok) {
+                                const aliasData = await aliasResponse.json();
+                                displayName = aliasData.alias;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching alias for room:', error);
+                }
+            }
+            
             const roomElement = document.createElement('div');
             roomElement.className = 'room-item';
             if (room.id === this.currentRoomId) {
@@ -436,20 +484,31 @@ class ChatManager {
             }
             
             roomElement.innerHTML = `
-                <div class="room-item-name">${room.name}</div>
+                <div class="room-item-name">${displayName}</div>
                 <div class="room-item-type">${room.type === 'direct' ? 'Trực tiếp' : `Nhóm (${room.participant_count})`}</div>
             `;
             
-            roomElement.onclick = () => this.selectRoom(room.id, room.name);
+            roomElement.onclick = () => this.selectRoom(room.id, room.name, room.type);
             
             this.roomListElement.appendChild(roomElement);
-        });
+        }
     }
     
-    async selectRoom(roomId, roomName) {
+    async selectRoom(roomId, roomName, roomType) {
         this.currentRoomId = roomId;
-        this.currentRoomNameElement.textContent = roomName;
+        this.currentRoomType = roomType;
         this.typingIndicator.textContent = '';
+        
+        // Hiển thị button sửa biệt danh cho direct chat
+        if (this.editAliasBtn) {
+            if (roomType === 'direct') {
+                this.editAliasBtn.style.display = 'block';
+            } else {
+                this.editAliasBtn.style.display = 'none';
+                this.otherUserId = null;
+                this.otherUserName = null;
+            }
+        }
         
         // Update active room in list
         this.renderRoomList();
@@ -465,8 +524,15 @@ class ChatManager {
             room_id: roomId
         });
         
-        // Load messages
+        // Load messages và lấy thông tin user khác nếu là direct chat
         await this.loadMessages(roomId);
+        
+        // Nếu là direct chat, hiển thị biệt danh thay vì tên phòng
+        if (roomType === 'direct' && this.otherUserId && this.otherUserName) {
+            this.currentRoomNameElement.textContent = this.otherUserName;
+        } else {
+            this.currentRoomNameElement.textContent = roomName;
+        }
     }
     
     async loadMessages(roomId) {
@@ -487,11 +553,37 @@ class ChatManager {
             
             if (messages.length === 0) {
                 this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Hãy là người đầu tiên gửi tin nhắn!</p>';
-                return;
+            } else {
+                // Nếu là direct chat, lấy thông tin user khác và fetch alias
+                if (this.currentRoomType === 'direct') {
+                    const otherUserMessage = messages.find(msg => msg.sender_id !== currentUser.id);
+                    if (otherUserMessage) {
+                        this.otherUserId = otherUserMessage.sender_id;
+                        
+                        // Fetch alias từ API
+                        try {
+                            const aliasResponse = await fetch(`${CHAT_API_URL}/alias/${otherUserMessage.sender_id}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${currentToken}`
+                                }
+                            });
+                            
+                            if (aliasResponse.ok) {
+                                const aliasData = await aliasResponse.json();
+                                this.otherUserName = aliasData.alias;
+                            } else {
+                                this.otherUserName = otherUserMessage.sender_username;
+                            }
+                        } catch (error) {
+                            console.error('Error fetching alias:', error);
+                            this.otherUserName = otherUserMessage.sender_username;
+                        }
+                    }
+                }
+                
+                messages.forEach(msg => this.renderMessage(msg, false));
+                this.scrollToBottom();
             }
-            
-            messages.forEach(msg => this.renderMessage(msg, false));
-            this.scrollToBottom();
         } catch (error) {
             console.error('Error loading messages:', error);
             this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--error); padding: 20px;">Lỗi tải tin nhắn</p>';
@@ -509,9 +601,15 @@ class ChatManager {
             minute: '2-digit' 
         });
         
+        // Sử dụng alias nếu là direct chat và người gửi là người khác
+        let senderName = message.sender_username;
+        if (!isOwn && this.currentRoomType === 'direct' && this.otherUserName) {
+            senderName = this.otherUserName;
+        }
+        
         messageElement.innerHTML = `
             <div class="message-bubble">
-                ${!isOwn ? `<div class="message-sender">${message.sender_username}</div>` : ''}
+                ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
                 <div>${message.content}</div>
                 <div class="message-time">${time}</div>
             </div>
@@ -558,6 +656,52 @@ class ChatManager {
     
     scrollToBottom() {
         this.messagesElement.scrollTop = this.messagesElement.scrollHeight;
+    }
+    
+    async editAlias() {
+        if (!this.otherUserId || !this.otherUserName) {
+            alert('Không tìm thấy thông tin người dùng');
+            return;
+        }
+        
+        const newAlias = prompt(`Sửa biệt danh cho ${this.otherUserName}:`, this.otherUserName);
+        if (!newAlias || !newAlias.trim()) return;
+        
+        try {
+            const response = await fetch(`${CHAT_API_URL}/alias`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify({
+                    user_set: currentUser.id,
+                    user_get: this.otherUserId,
+                    alias_name: newAlias.trim()
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to set alias');
+            }
+            
+            // Cập nhật biến danh hiện tại
+            this.otherUserName = newAlias.trim();
+            
+            // Cập nhật header
+            this.currentRoomNameElement.textContent = newAlias.trim();
+            
+            // Reload room list để cập nhật tên phòng
+            await this.renderRoomList();
+            
+            // Reload messages để hiển thị alias mới
+            await this.loadMessages(this.currentRoomId);
+            
+        } catch (error) {
+            console.error('Error setting alias:', error);
+            alert('Lỗi cập nhật biệt danh: ' + error.message);
+        }
     }
     
     async loadAllUsers() {
@@ -721,4 +865,3 @@ class ChatManager {
         }
     }
 }
-

@@ -185,13 +185,24 @@ class WebSocketController:
         
         user = user_dao.get_by_id(user_id)
         
-        # Broadcast typing status đến room (trừ bản thân)
-        await ws_manager.broadcast_to_room({
-            "type": "typing",
-            "user_id": user_id,
-            "username": user.username if user else "Unknown",
-            "is_typing": is_typing
-        }, room_id, exclude_user=user_id)
+        # Lấy danh sách participants trong room
+        participants = chat_participant_dao.get_user_ids_in_room(room_id)
+        
+        # Gửi typing status có alias cá nhân hóa đến từng participant
+        for participant_id in participants:
+            if participant_id != user_id:  # Không gửi cho chính mình
+                # Lấy alias của user đang typing từ góc nhìn participant
+                typing_user_alias = alias_dao.get_alias(participant_id, user_id)
+                
+                if not typing_user_alias:
+                    typing_user_alias = user.username if user else "Unknown"
+                
+                await ws_manager.send_personal_message({
+                    "type": "typing",
+                    "user_id": user_id,
+                    "username": typing_user_alias,  # Dùng alias!
+                    "is_typing": is_typing
+                }, participant_id)
     
     async def _handle_leave_room(self, user_id: str, data: dict):
         """
