@@ -1,5 +1,5 @@
 from fastapi import WebSocket
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 import json
 
 
@@ -50,6 +50,12 @@ class WebSocketManager:
         if room_id in self.room_participants:
             self.room_participants[room_id].discard(user_id)
     
+    def is_user_in_room(self, user_id: str, room_id: str) -> bool:
+        """
+        Kiểm tra user đã join room qua WebSocket chưa
+        """
+        return room_id in self.room_participants and user_id in self.room_participants[room_id]
+    
     async def send_personal_message(self, message: dict, user_id: str):
         """
         Gửi message đến 1 user cụ thể
@@ -60,7 +66,7 @@ class WebSocketManager:
             except Exception as e:
                 print(f"Error sending message to {user_id}: {e}")
     
-    async def broadcast_to_room(self, message: dict, room_id: str, exclude_user: str = None):
+    async def broadcast_to_room(self, message: dict, room_id: str, exclude_user: Optional[str] = None):
         """
         Broadcast message đến tất cả users trong room
         """

@@ -354,6 +354,17 @@ class ChatManager {
                 console.log('Connected to chat');
                 break;
                 
+            case 'room_joined':
+                console.log('Successfully joined room:', data.room_id);
+                // Enable message input after successful join
+                if (data.room_id === this.currentRoomId) {
+                    this.chatInput.disabled = false;
+                    this.sendBtn.disabled = false;
+                    this.chatInput.placeholder = 'Nhập tin nhắn...';
+                    this.chatInput.focus();
+                }
+                break;
+                
             case 'new_message':
                 if (data.message.chat_room_id === this.currentRoomId) {
                     this.renderMessage(data.message);
@@ -432,10 +443,10 @@ class ChatManager {
         // Update active room in list
         this.renderRoomList();
         
-        // Enable input
-        this.chatInput.disabled = false;
-        this.sendBtn.disabled = false;
-        this.chatInput.focus();
+        // Disable input while joining
+        this.chatInput.disabled = true;
+        this.sendBtn.disabled = true;
+        this.chatInput.placeholder = 'Đang tham gia phòng chat...';
         
         // Join room via WebSocket
         this.sendWebSocketMessage({

@@ -98,6 +98,13 @@ class WebSocketController:
         # Join room
         ws_manager.join_room(user_id, room_id)
         
+        # Gửi xác nhận join thành công cho user
+        await ws_manager.send_personal_message({
+            "type": "room_joined",
+            "room_id": room_id,
+            "message": "Successfully joined room"
+        }, user_id)
+        
         # Thông báo cho user khác
         user = user_dao.get_by_id(user_id)
         await ws_manager.broadcast_to_room({
@@ -115,6 +122,14 @@ class WebSocketController:
         message_type = data.get("message_type", "text")
         
         if not room_id or not content:
+            return
+        
+        # Kiểm tra user đã join room qua WebSocket chưa
+        if not ws_manager.is_user_in_room(user_id, room_id):
+            await ws_manager.send_personal_message({
+                "type": "error",
+                "message": "You must join the room before sending messages"
+            }, user_id)
             return
         
         # Lưu message vào DB
