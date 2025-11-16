@@ -10,6 +10,7 @@ from dao.message_dao import message_dao
 from dao.alias_dao import alias_dao
 from dao.user_dao import user_dao
 from utils.security import security_utils
+from utils.websocket_manager import ws_manager
 
 
 class ChatController:
@@ -112,14 +113,35 @@ class ChatController:
                 )
                 chat_participant_dao.create(participant2)
             
-            return ChatRoomResponse(
+            # Lấy danh sách participants để broadcast
+            participant_count = 2 if room_data.type == "direct" else 1
+            participants = chat_participant_dao.get_user_ids_in_room(new_room.id)
+            
+            # Broadcast room_created event đến tất cả participants
+            room_response = ChatRoomResponse(
                 id=new_room.id,
                 name=new_room.name,
                 type=new_room.type,
                 create_at=new_room.create_at,
                 admin_id=new_room.admin_id,
-                participant_count=2 if room_data.type == "direct" else 1
+                participant_count=participant_count
             )
+            
+            for participant_id in participants:
+                await ws_manager.send_personal_message({
+                    "type": "room_created",
+                    "room": {
+                        "id": room_response.id,
+                        "name": room_response.name,
+                        "type": room_response.type,
+                        "create_at": room_response.create_at.isoformat(),
+                        "admin_id": room_response.admin_id,
+                        "participant_count": room_response.participant_count
+                    },
+                    "creator_id": user_id
+                }, participant_id)
+            
+            return room_response
         except HTTPException:
             raise
         except Exception as e:

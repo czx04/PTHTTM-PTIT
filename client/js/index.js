@@ -354,6 +354,17 @@ class ChatManager {
                 console.log('Connected to chat');
                 break;
                 
+            case 'room_created':
+                console.log('New room created:', data.room);
+                // Thêm room mới vào đầu danh sách
+                this.rooms.unshift(data.room);
+                this.renderRoomList();
+                // Tự động chọn room mới (chỉ nếu user hiện tại là người tạo)
+                if (data.creator_id === currentUser.id) {
+                    this.selectRoom(data.room.id, data.room.name);
+                }
+                break;
+                
             case 'room_joined':
                 console.log('Successfully joined room:', data.room_id);
                 // Enable message input after successful join
@@ -636,13 +647,8 @@ class ChatManager {
                 throw new Error(error.detail || 'Failed to create direct chat');
             }
             
-            const newRoom = await response.json();
-            
-            // Reload rooms
-            await this.loadRooms();
-            
-            // Select new room
-            this.selectRoom(newRoom.id, newRoom.name);
+            // Room sẽ được thêm vào list qua WebSocket event 'room_created'
+            // Không cần gọi loadRooms() nữa
         } catch (error) {
             console.error('Error creating direct chat:', error);
             alert('Lỗi tạo chat: ' + error.message);
@@ -669,13 +675,8 @@ class ChatManager {
                 throw new Error(error.detail || 'Failed to create group');
             }
             
-            const newRoom = await response.json();
-            
-            // Reload rooms
-            await this.loadRooms();
-            
-            // Select new room
-            this.selectRoom(newRoom.id, newRoom.name);
+            // Room sẽ được thêm vào list qua WebSocket event 'room_created'
+            // Không cần gọi loadRooms() nữa
         } catch (error) {
             console.error('Error creating group room:', error);
             alert('Lỗi tạo nhóm chat: ' + error.message);
