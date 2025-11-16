@@ -92,30 +92,33 @@ class ChatController:
             )
             chat_participant_dao.create(admin_participant)
             
-            # Nếu là direct chat, tạo alias mặc định
-            if room_data.type == "direct" and room_data.participant_ids and len(room_data.participant_ids) == 2:
-                participant_ids = room_data.participant_ids
-                user1_id, user2_id = participant_ids
+            # Xử lý participant_ids nếu có
+            if room_data.participant_ids:
+                # Nếu là direct chat, tạo alias mặc định
+                if room_data.type == "direct" and len(room_data.participant_ids) == 2:
+                    user1_id, user2_id = room_data.participant_ids
+                    
+                    # Lấy usernames
+                    user1 = user_dao.get_by_id(user1_id)
+                    user2 = user_dao.get_by_id(user2_id)
+                    
+                    if user1 and user2:
+                        # Tạo alias mặc định (tên của người kia)
+                        alias_dao.create_or_update(user1_id, user2_id, user2.username)
+                        alias_dao.create_or_update(user2_id, user1_id, user1.username)
                 
-                # Lấy usernames
-                user1 = user_dao.get_by_id(user1_id)
-                user2 = user_dao.get_by_id(user2_id)
-                
-                if user1 and user2:
-                    # Tạo alias mặc định (tên của người kia)
-                    alias_dao.create_or_update(user1_id, user2_id, user2.username)
-                    alias_dao.create_or_update(user2_id, user1_id, user1.username)
-                
-                # Thêm user thứ 2 vào room
-                participant2 = ChatParticipantCreate(
-                    user_id=user2_id,
-                    chat_room_id=new_room.id
-                )
-                chat_participant_dao.create(participant2)
+                # Thêm các participants khác (trừ admin vì đã add rồi)
+                for participant_id in room_data.participant_ids:
+                    if participant_id != room_data.admin_id:
+                        participant = ChatParticipantCreate(
+                            user_id=participant_id,
+                            chat_room_id=new_room.id
+                        )
+                        chat_participant_dao.create(participant)
             
             # Lấy danh sách participants để broadcast
-            participant_count = 2 if room_data.type == "direct" else 1
             participants = chat_participant_dao.get_user_ids_in_room(new_room.id)
+            participant_count = len(participants)
             
             # Broadcast room_created event đến tất cả participants
             room_response = ChatRoomResponse(

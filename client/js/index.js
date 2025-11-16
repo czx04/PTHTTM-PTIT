@@ -619,9 +619,39 @@ class ChatManager {
     
     async showCreateGroupChatDialog() {
         const roomName = prompt('Nhập tên nhóm chat:');
-        if (!roomName) return;
+        if (!roomName || !roomName.trim()) return;
         
-        await this.createGroupRoom(roomName);
+        // Lấy danh sách users
+        const users = await this.loadAllUsers();
+        if (users.length === 0) {
+            alert('Không có người dùng nào để thêm vào nhóm');
+            return;
+        }
+        
+        // Tạo dialog chọn nhiều users
+        let userList = 'Chọn thành viên cho nhóm (nhập số cách nhau bằng dấu phẩy, ví dụ: 1,2,3):\n\n';
+        users.forEach((user, index) => {
+            userList += `${index + 1}. ${user.username}\n`;
+        });
+        
+        const choice = prompt(userList + '\nNhập số thứ tự (hoặc bỏ qua để tạo nhóm trống):');
+        
+        let selectedUserIds = [currentUser.id]; // Admin luôn là thành viên
+        
+        if (choice && choice.trim()) {
+            const indices = choice.split(',').map(s => parseInt(s.trim()) - 1);
+            
+            for (const index of indices) {
+                if (index >= 0 && index < users.length) {
+                    const userId = users[index].id;
+                    if (!selectedUserIds.includes(userId)) {
+                        selectedUserIds.push(userId);
+                    }
+                }
+            }
+        }
+        
+        await this.createGroupRoom(roomName.trim(), selectedUserIds);
     }
     
     async createDirectRoom(targetUser) {
@@ -655,7 +685,7 @@ class ChatManager {
         }
     }
     
-    async createGroupRoom(roomName) {
+    async createGroupRoom(roomName, participantIds) {
         try {
             const response = await fetch(`${CHAT_API_URL}/rooms`, {
                 method: 'POST',
@@ -666,7 +696,8 @@ class ChatManager {
                 body: JSON.stringify({
                     name: roomName,
                     type: 'group',
-                    admin_id: currentUser.id
+                    admin_id: currentUser.id,
+                    participant_ids: participantIds
                 })
             });
             
