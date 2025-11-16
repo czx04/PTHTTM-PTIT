@@ -35,9 +35,18 @@ class ChatRoomDAO:
                     room_data.admin_id
                 ))
                 
-                return self.get_by_id(room_id)
+                # Trả về object mới tạo (không gọi get_by_id vì cursor chưa commit)
+                return ChatRoom(
+                    id=room_id,
+                    name=room_data.name,
+                    type=room_data.type,
+                    create_at=create_at,
+                    admin_id=room_data.admin_id
+                )
         except Exception as e:
             print(f"Error creating chat room: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_by_id(self, room_id: str) -> Optional[ChatRoom]:

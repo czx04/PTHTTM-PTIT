@@ -34,9 +34,16 @@ class ChatParticipantDAO:
                     participant_data.chat_room_id
                 ))
                 
-                return self.get_by_id(participant_id)
+                return ChatParticipant(
+                    id=participant_id,
+                    join_at=join_at,
+                    user_id=participant_data.user_id,
+                    chat_room_id=participant_data.chat_room_id
+                )
         except Exception as e:
             print(f"Error creating participant: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_by_id(self, participant_id: str) -> Optional[ChatParticipant]:

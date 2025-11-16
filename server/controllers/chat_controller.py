@@ -68,27 +68,32 @@ class ChatController:
         """
         Tạo chat room mới (direct hoặc group)
         """
-        user_id = self._verify_token(authorization)
-        
-        # Tạo room
-        new_room = chat_room_dao.create(room_data)
-        if not new_room:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create room"
+        try:
+            print(f"=== CREATE ROOM START ===")
+            print(f"Room data: {room_data}")
+            user_id = self._verify_token(authorization)
+            print(f"User ID: {user_id}")
+            
+            # Tạo room
+            print(f"Creating room in DAO...")
+            new_room = chat_room_dao.create(room_data)
+            print(f"New room created: {new_room}")
+            if not new_room:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create room"
+                )
+            
+            # Thêm admin vào room
+            admin_participant = ChatParticipantCreate(
+                user_id=room_data.admin_id,
+                chat_room_id=new_room.id
             )
-        
-        # Thêm admin vào room
-        admin_participant = ChatParticipantCreate(
-            user_id=room_data.admin_id,
-            chat_room_id=new_room.id
-        )
-        chat_participant_dao.create(admin_participant)
-        
-        # Nếu là direct chat, tạo alias mặc định
-        if room_data.type == "direct" and hasattr(room_data, 'participant_ids'):
-            participant_ids = room_data.participant_ids
-            if len(participant_ids) == 2:
+            chat_participant_dao.create(admin_participant)
+            
+            # Nếu là direct chat, tạo alias mặc định
+            if room_data.type == "direct" and room_data.participant_ids and len(room_data.participant_ids) == 2:
+                participant_ids = room_data.participant_ids
                 user1_id, user2_id = participant_ids
                 
                 # Lấy usernames
@@ -106,15 +111,25 @@ class ChatController:
                     chat_room_id=new_room.id
                 )
                 chat_participant_dao.create(participant2)
-        
-        return ChatRoomResponse(
-            id=new_room.id,
-            name=new_room.name,
-            type=new_room.type,
-            create_at=new_room.create_at,
-            admin_id=new_room.admin_id,
-            participant_count=2 if room_data.type == "direct" else 1
-        )
+            
+            return ChatRoomResponse(
+                id=new_room.id,
+                name=new_room.name,
+                type=new_room.type,
+                create_at=new_room.create_at,
+                admin_id=new_room.admin_id,
+                participant_count=2 if room_data.type == "direct" else 1
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error creating room: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create room: {str(e)}"
+            )
     
     async def get_my_rooms(
         self,

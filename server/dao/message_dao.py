@@ -36,9 +36,18 @@ class MessageDAO:
                     message_data.message_type
                 ))
                 
-                return self.get_by_id(message_id)
+                return Message(
+                    id=message_id,
+                    content=message_data.content,
+                    sent_at=sent_at,
+                    sender_id=message_data.sender_id,
+                    chat_room_id=message_data.chat_room_id,
+                    message_type=message_data.message_type
+                )
         except Exception as e:
             print(f"Error creating message: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_by_id(self, message_id: str) -> Optional[Message]:
