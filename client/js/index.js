@@ -1,9 +1,12 @@
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000/api/auth';
+const CHAT_API_URL = 'http://localhost:8000/api/chat';
+const WS_URL = 'ws://localhost:8000/ws/chat';
 
 // Global state
 let currentUser = null;
 let currentToken = null;
+let chatManager = null;
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
@@ -97,6 +100,11 @@ function showDashboard(user) {
     authStatus.classList.remove('offline');
     authStatus.classList.add('online');
     authStatus.innerHTML = '<div class="status-dot"></div><span>Đã xác thực</span>';
+    
+    // Initialize chat
+    if (!chatManager) {
+        chatManager = new ChatManager();
+    }
 }
 
 function showAuthPage() {
@@ -200,6 +208,12 @@ async function handleLogout() {
         // Continue with local logout even if API fails
     }
     
+    // Disconnect chat
+    if (chatManager) {
+        chatManager.disconnect();
+        chatManager = null;
+    }
+    
     // Clear session
     clearSession();
     
@@ -264,3 +278,404 @@ document.getElementById('register-phone').addEventListener('keypress', (e) => {
 
 // Initialize app on page load
 initializeApp();
+
+// ===== CHAT MANAGER CLASS =====
+
+class ChatManager {
+    constructor() {
+        this.ws = null;
+        this.currentRoomId = null;
+        this.rooms = [];
+        this.typingTimeout = null;
+        
+        this.roomListElement = document.getElementById('room-list');
+        this.messagesElement = document.getElementById('chat-messages');
+        this.chatInput = document.getElementById('chat-input');
+        this.sendBtn = document.getElementById('send-message-btn');
+        this.currentRoomNameElement = document.getElementById('current-room-name');
+        this.typingIndicator = document.getElementById('typing-indicator');
+        
+        this.setupEventListeners();
+        this.connectWebSocket();
+        this.loadRooms();
+    }
+    
+    setupEventListeners() {
+        // Enter key to send message
+        this.chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !this.chatInput.disabled) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+        
+        // Typing indicator
+        this.chatInput.addEventListener('input', () => {
+            if (!this.currentRoomId) return;
+            
+            this.sendTyping(true);
+            
+            if (this.typingTimeout) {
+                clearTimeout(this.typingTimeout);
+            }
+            
+            this.typingTimeout = setTimeout(() => {
+                this.sendTyping(false);
+            }, 2000);
+        });
+    }
+    
+    connectWebSocket() {
+        if (!currentToken) return;
+        
+        this.ws = new WebSocket(`${WS_URL}?token=${currentToken}`);
+        
+        this.ws.onopen = () => {
+            console.log('WebSocket connected');
+        };
+        
+        this.ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleWebSocketMessage(data);
+        };
+        
+        this.ws.onclose = () => {
+            console.log('WebSocket disconnected');
+        };
+        
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
+    
+    handleWebSocketMessage(data) {
+        switch(data.type) {
+            case 'connected':
+                console.log('Connected to chat');
+                break;
+                
+            case 'new_message':
+                if (data.message.chat_room_id === this.currentRoomId) {
+                    this.renderMessage(data.message);
+                }
+                break;
+                
+            case 'typing':
+                if (data.user_id !== currentUser.id) {
+                    if (data.is_typing) {
+                        this.typingIndicator.textContent = `${data.username} đang gõ...`;
+                    } else {
+                        this.typingIndicator.textContent = '';
+                    }
+                }
+                break;
+                
+            case 'user_joined':
+                console.log(`${data.username} joined the room`);
+                break;
+                
+            case 'error':
+                alert('Lỗi: ' + data.message);
+                break;
+        }
+    }
+    
+    async loadRooms() {
+        try {
+            const response = await fetch(`${CHAT_API_URL}/rooms`, {
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`
+                }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load rooms');
+            
+            this.rooms = await response.json();
+            this.renderRoomList();
+        } catch (error) {
+            console.error('Error loading rooms:', error);
+            this.roomListElement.innerHTML = '<p style="text-align: center; color: var(--error); padding: 20px;">Lỗi tải phòng chat</p>';
+        }
+    }
+    
+    renderRoomList() {
+        if (this.rooms.length === 0) {
+            this.roomListElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Chưa có phòng chat nào</p>';
+            return;
+        }
+        
+        this.roomListElement.innerHTML = '';
+        
+        this.rooms.forEach(room => {
+            const roomElement = document.createElement('div');
+            roomElement.className = 'room-item';
+            if (room.id === this.currentRoomId) {
+                roomElement.classList.add('active');
+            }
+            
+            roomElement.innerHTML = `
+                <div class="room-item-name">${room.name}</div>
+                <div class="room-item-type">${room.type === 'direct' ? 'Trực tiếp' : `Nhóm (${room.participant_count})`}</div>
+            `;
+            
+            roomElement.onclick = () => this.selectRoom(room.id, room.name);
+            
+            this.roomListElement.appendChild(roomElement);
+        });
+    }
+    
+    async selectRoom(roomId, roomName) {
+        this.currentRoomId = roomId;
+        this.currentRoomNameElement.textContent = roomName;
+        this.typingIndicator.textContent = '';
+        
+        // Update active room in list
+        this.renderRoomList();
+        
+        // Enable input
+        this.chatInput.disabled = false;
+        this.sendBtn.disabled = false;
+        this.chatInput.focus();
+        
+        // Join room via WebSocket
+        this.sendWebSocketMessage({
+            type: 'join_room',
+            room_id: roomId
+        });
+        
+        // Load messages
+        await this.loadMessages(roomId);
+    }
+    
+    async loadMessages(roomId) {
+        try {
+            this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Đang tải tin nhắn...</p>';
+            
+            const response = await fetch(`${CHAT_API_URL}/rooms/${roomId}/messages`, {
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`
+                }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load messages');
+            
+            const messages = await response.json();
+            
+            this.messagesElement.innerHTML = '';
+            
+            if (messages.length === 0) {
+                this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Hãy là người đầu tiên gửi tin nhắn!</p>';
+                return;
+            }
+            
+            messages.forEach(msg => this.renderMessage(msg, false));
+            this.scrollToBottom();
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--error); padding: 20px;">Lỗi tải tin nhắn</p>';
+        }
+    }
+    
+    renderMessage(message, autoScroll = true) {
+        const isOwn = message.sender_id === currentUser.id;
+        
+        const messageElement = document.createElement('div');
+        messageElement.className = `message-item ${isOwn ? 'own' : 'other'}`;
+        
+        const time = new Date(message.sent_at).toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        messageElement.innerHTML = `
+            <div class="message-bubble">
+                ${!isOwn ? `<div class="message-sender">${message.sender_username}</div>` : ''}
+                <div>${message.content}</div>
+                <div class="message-time">${time}</div>
+            </div>
+        `;
+        
+        this.messagesElement.appendChild(messageElement);
+        
+        if (autoScroll) {
+            this.scrollToBottom();
+        }
+    }
+    
+    sendMessage() {
+        const content = this.chatInput.value.trim();
+        
+        if (!content || !this.currentRoomId) return;
+        
+        this.sendWebSocketMessage({
+            type: 'send_message',
+            room_id: this.currentRoomId,
+            content: content,
+            message_type: 'text'
+        });
+        
+        this.chatInput.value = '';
+        this.sendTyping(false);
+    }
+    
+    sendTyping(isTyping) {
+        if (!this.currentRoomId) return;
+        
+        this.sendWebSocketMessage({
+            type: 'typing',
+            room_id: this.currentRoomId,
+            is_typing: isTyping
+        });
+    }
+    
+    sendWebSocketMessage(data) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(data));
+        }
+    }
+    
+    scrollToBottom() {
+        this.messagesElement.scrollTop = this.messagesElement.scrollHeight;
+    }
+    
+    async loadAllUsers() {
+        try {
+            const response = await fetch(`${CHAT_API_URL}/users`, {
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`
+                }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load users');
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error loading users:', error);
+            return [];
+        }
+    }
+    
+    async showCreateDirectChatDialog() {
+        const users = await this.loadAllUsers();
+        
+        if (users.length === 0) {
+            alert('Không có người dùng nào khác để chat');
+            return;
+        }
+        
+        // Tạo dialog chọn user
+        let userList = 'Chọn người để chat:\n\n';
+        users.forEach((user, index) => {
+            userList += `${index + 1}. ${user.username}\n`;
+        });
+        
+        const choice = prompt(userList + '\nNhập số thứ tự:');
+        if (!choice) return;
+        
+        const index = parseInt(choice) - 1;
+        if (index < 0 || index >= users.length) {
+            alert('Lựa chọn không hợp lệ');
+            return;
+        }
+        
+        const selectedUser = users[index];
+        
+        // Kiểm tra xem đã có direct chat chưa
+        const existingRoom = this.rooms.find(room => 
+            room.type === 'direct' && 
+            (room.name.includes(selectedUser.username) || room.name.includes(currentUser.username))
+        );
+        
+        if (existingRoom) {
+            this.selectRoom(existingRoom.id, existingRoom.name);
+            return;
+        }
+        
+        // Tạo direct chat mới
+        await this.createDirectRoom(selectedUser);
+    }
+    
+    async showCreateGroupChatDialog() {
+        const roomName = prompt('Nhập tên nhóm chat:');
+        if (!roomName) return;
+        
+        await this.createGroupRoom(roomName);
+    }
+    
+    async createDirectRoom(targetUser) {
+        try {
+            const roomName = `${currentUser.username} & ${targetUser.username}`;
+            
+            const response = await fetch(`${CHAT_API_URL}/rooms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify({
+                    name: roomName,
+                    type: 'direct',
+                    admin_id: currentUser.id,
+                    participant_ids: [currentUser.id, targetUser.id]
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create direct chat');
+            }
+            
+            const newRoom = await response.json();
+            
+            // Reload rooms
+            await this.loadRooms();
+            
+            // Select new room
+            this.selectRoom(newRoom.id, newRoom.name);
+        } catch (error) {
+            console.error('Error creating direct chat:', error);
+            alert('Lỗi tạo chat: ' + error.message);
+        }
+    }
+    
+    async createGroupRoom(roomName) {
+        try {
+            const response = await fetch(`${CHAT_API_URL}/rooms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify({
+                    name: roomName,
+                    type: 'group',
+                    admin_id: currentUser.id
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create group');
+            }
+            
+            const newRoom = await response.json();
+            
+            // Reload rooms
+            await this.loadRooms();
+            
+            // Select new room
+            this.selectRoom(newRoom.id, newRoom.name);
+        } catch (error) {
+            console.error('Error creating group room:', error);
+            alert('Lỗi tạo nhóm chat: ' + error.message);
+        }
+    }
+    
+    disconnect() {
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+        }
+    }
+}
+

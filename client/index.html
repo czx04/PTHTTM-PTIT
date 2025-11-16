@@ -154,18 +154,75 @@
           </div>
 
           <div class="card feature-card" id="feature-card">
-            <h2>Tính Năng</h2>
-            <div class="feature-placeholder">
-              <p
-                style="
-                  text-align: center;
-                  color: var(--text-secondary);
-                  padding: 40px 20px;
-                "
-              >
-                Các tính năng mở rộng sẽ được phát triển tại đây.<br />
-                (Chat, Game, v.v...)
-              </p>
+            <h2>Chat</h2>
+            <div class="chat-container">
+              <!-- Sidebar: Danh sách rooms -->
+              <div class="chat-sidebar">
+                <div class="chat-sidebar-header">
+                  <button
+                    class="btn btn-primary btn-small"
+                    onclick="chatManager.showCreateDirectChatDialog()"
+                    style="margin-bottom: 8px; width: 100%"
+                  >
+                    + Chat 1-1
+                  </button>
+                  <button
+                    class="btn btn-primary btn-small"
+                    onclick="chatManager.showCreateGroupChatDialog()"
+                    style="width: 100%"
+                  >
+                    + Nhóm
+                  </button>
+                </div>
+                <div class="room-list" id="room-list">
+                  <p
+                    style="
+                      text-align: center;
+                      color: var(--text-secondary);
+                      padding: 20px;
+                    "
+                  >
+                    Chưa có phòng chat nào
+                  </p>
+                </div>
+              </div>
+
+              <!-- Chat Area -->
+              <div class="chat-main">
+                <div class="chat-main-header" id="chat-main-header">
+                  <h3 id="current-room-name">Chọn một phòng chat</h3>
+                  <span class="typing-indicator" id="typing-indicator"></span>
+                </div>
+
+                <div class="chat-messages" id="chat-messages">
+                  <p
+                    style="
+                      text-align: center;
+                      color: var(--text-secondary);
+                      padding: 40px 20px;
+                    "
+                  >
+                    Chọn một phòng để bắt đầu chat
+                  </p>
+                </div>
+
+                <div class="chat-input-container">
+                  <input
+                    type="text"
+                    id="chat-input"
+                    placeholder="Nhập tin nhắn..."
+                    disabled
+                  />
+                  <button
+                    class="btn btn-primary"
+                    id="send-message-btn"
+                    onclick="chatManager.sendMessage()"
+                    disabled
+                  >
+                    Gửi
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
