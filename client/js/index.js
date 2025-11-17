@@ -86,20 +86,21 @@ function showDashboard(user) {
     document.getElementById('welcome-username').textContent = user.username;
     document.getElementById('user-id-display').textContent = `ID: ${user.id}`;
     
-    // Update profile card
-    document.getElementById('profile-username').textContent = user.username;
-    document.getElementById('profile-id').textContent = user.id;
-    document.getElementById('profile-phone').textContent = user.phone || 'Chưa cập nhật';
-    
-    // Update avatar
-    const avatarLarge = document.getElementById('user-avatar');
-    avatarLarge.textContent = user.username.charAt(0).toUpperCase();
-    
     // Initialize chat
     if (!chatManager) {
         chatManager = new ChatManager();
         window.chatManager = chatManager; // Store globally for modal access
     }
+}
+
+// ===== GAME HANDLERS =====
+
+function handlePlayWithPlayer() {
+    alert('🎮 Chế độ "Chơi với Người" đang được phát triển!');
+}
+
+function handlePlayWithAI() {
+    alert('🤖 Chế độ "Chơi với Máy" đang được phát triển!');
 }
 
 function showAuthPage() {

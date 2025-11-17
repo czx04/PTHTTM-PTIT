@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FastAPI Authentication System</title>
+    <title>AI GOKOMU</title>
     <link rel="stylesheet" href="./css/style.css" />
   </head>
   <body>
     <div class="auth-container" id="auth-container">
       <div class="auth-wrapper">
         <div class="auth-content">
-          <h1>FastAPI Auth</h1>
-          <p>Hệ thống xác thực người dùng với JWT và FastAPI.</p>
+          <h1>Gokomu AI</h1>
+          <p>Game cờ caro trực tuyến</p>
           <div style="margin-top: 40px">
             <h3 style="margin-bottom: 15px; color: var(--primary)">
               Tính năng nổi bật
@@ -23,9 +23,9 @@
                 line-height: 2;
               "
             >
-              <li>✓ Xác thực JWT an toàn</li>
-              <li>✓ Mã hóa mật khẩu bcrypt</li>
-              <li>✓ Kiến trúc OOP chuẩn</li>
+              <li>Chơi với bạn bè PVP</li>
+              <li>Chơi với máy PVE</li>
+              <li>Chat</li>
             </ul>
           </div>
         </div>
@@ -127,24 +127,65 @@
 
         <div class="dashboard-content">
           <div class="card" id="user-card">
-            <h2>Thông Tin Cá Nhân</h2>
-            <div class="user-profile">
-              <div class="user-avatar-large" id="user-avatar">
-                <!-- Avatar sẽ được render bằng JS -->
+            <h2>Game Gomoku (Cờ Carô)</h2>
+            <div style="padding: 20px">
+              <p
+                style="
+                  color: var(--text-secondary);
+                  line-height: 1.8;
+                  margin-bottom: 20px;
+                "
+              >
+                Gomoku là trò chơi cờ truyền thống với luật chơi đơn giản nhưng
+                đầy thách thức. Người chơi lần lượt đặt quân cờ trên bàn cờ, ai
+                tạo được 5 quân liên tiếp (ngang, dọc hoặc chéo) sẽ chiến thắng!
+              </p>
+              <div
+                style="
+                  background: var(--bg-light);
+                  padding: 15px;
+                  border-radius: 8px;
+                  margin-bottom: 20px;
+                "
+              >
+                <h3
+                  style="
+                    margin: 0 0 10px 0;
+                    color: var(--primary);
+                    font-size: 1rem;
+                  "
+                >
+                  Luật chơi:
+                </h3>
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 20px;
+                    color: var(--text-secondary);
+                    line-height: 2;
+                  "
+                >
+                  <li>Bàn cờ 15x15 ô</li>
+                  <li>2 người chơi luân phiên đặt quân</li>
+                  <li>5 quân liên tiếp = Chiến thắng</li>
+                  <li>Không được đặt quân vào ô đã có quân</li>
+                </ul>
               </div>
-              <div class="user-details">
-                <div class="detail-row">
-                  <span class="detail-label">Username:</span>
-                  <span class="detail-value" id="profile-username">-</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">User ID:</span>
-                  <span class="detail-value" id="profile-id">-</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Số điện thoại:</span>
-                  <span class="detail-value" id="profile-phone">-</span>
-                </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                <button
+                  class="btn btn-primary"
+                  onclick="handlePlayWithPlayer()"
+                  style="flex: 1; min-width: 150px"
+                >
+                  Chơi với Người
+                </button>
+                <button
+                  class="btn btn-primary"
+                  onclick="handlePlayWithAI()"
+                  style="flex: 1; min-width: 150px"
+                >
+                  Chơi với Máy
+                </button>
               </div>
             </div>
           </div>
@@ -160,14 +201,14 @@
                     onclick="chatManager.showCreateDirectChatDialog()"
                     style="margin-bottom: 8px; width: 100%"
                   >
-                    + Chat 1-1
+                    Chat
                   </button>
                   <button
                     class="btn btn-primary btn-small"
                     onclick="chatManager.showCreateGroupChatDialog()"
                     style="width: 100%"
                   >
-                    + Nhóm
+                    Tạo nhóm
                   </button>
                 </div>
                 <div class="room-list" id="room-list">
