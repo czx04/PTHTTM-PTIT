@@ -198,14 +198,14 @@
                 <div class="chat-sidebar-header">
                   <button
                     class="btn btn-primary btn-small"
-                    onclick="chatManager.showCreateDirectChatDialog()"
+                    onclick="showCreateDirectChat()"
                     style="margin-bottom: 8px; width: 100%"
                   >
                     Chat
                   </button>
                   <button
                     class="btn btn-primary btn-small"
-                    onclick="chatManager.showCreateGroupChatDialog()"
+                    onclick="showCreateGroupChat()"
                     style="width: 100%"
                   >
                     Tạo nhóm
@@ -249,7 +249,7 @@
                       "
                       title="Sửa biệt danh"
                     >
-                      ✏️ Sửa biệt danh
+                      Sửa biệt danh
                     </button>
                   </div>
                   <span class="typing-indicator" id="typing-indicator"></span>
@@ -277,7 +277,6 @@
                   <button
                     class="btn btn-primary"
                     id="send-message-btn"
-                    onclick="chatManager.sendMessage()"
                     disabled
                   >
                     Gửi
@@ -324,6 +323,33 @@
       </div>
     </div>
 
+    <!-- Load scripts in order: Models -> Services -> Views -> Controllers -> Main App -->
+
+    <!-- Models -->
+    <script src="./js/models/User.js"></script>
+    <script src="./js/models/ChatRoom.js"></script>
+    <script src="./js/models/Message.js"></script>
+    <script src="./js/models/AppState.js"></script>
+
+    <!-- Services -->
+    <script src="./js/services/ApiService.js"></script>
+    <script src="./js/services/AuthService.js"></script>
+    <script src="./js/services/ChatService.js"></script>
+    <script src="./js/services/WebSocketService.js"></script>
+
+    <!-- Views -->
+    <script src="./js/views/BaseView.js"></script>
+    <script src="./js/views/AuthView.js"></script>
+    <script src="./js/views/DashboardView.js"></script>
+    <script src="./js/views/ChatView.js"></script>
+    <script src="./js/views/ModalView.js"></script>
+
+    <!-- Controllers -->
+    <script src="./js/controllers/AuthController.js"></script>
+    <script src="./js/controllers/ChatController.js"></script>
+    <script src="./js/controllers/AppController.js"></script>
+
+    <!-- Main Application Entry Point -->
     <script src="./js/index.js"></script>
   </body>
 </html>
