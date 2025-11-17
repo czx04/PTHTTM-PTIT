@@ -511,19 +511,67 @@ class ChatManager {
         }
     }
     
+    async loadOtherUserInfo(roomId) {
+        try {
+            // Fetch participants để lấy thông tin người dùng khác
+            const response = await fetch(`${CHAT_API_URL}/rooms/${roomId}/participants`, {
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`
+                }
+            });
+            
+            if (response.ok) {
+                const participants = await response.json();
+                const otherUser = participants.find(p => p.user_id !== currentUser.id);
+                
+                if (otherUser) {
+                    this.otherUserId = otherUser.user_id;
+                    
+                    // Fetch alias
+                    const aliasResponse = await fetch(`${CHAT_API_URL}/alias/${otherUser.user_id}`, {
+                        headers: {
+                            'Authorization': `Bearer ${currentToken}`
+                        }
+                    });
+                    
+                    if (aliasResponse.ok) {
+                        const aliasData = await aliasResponse.json();
+                        this.otherUserName = aliasData.alias;
+                    } else {
+                        this.otherUserName = otherUser.username || 'Unknown';
+                    }
+                    
+                    console.log('Loaded other user info:', {
+                        userId: this.otherUserId,
+                        userName: this.otherUserName
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading other user info:', error);
+        }
+    }
+    
     async selectRoom(roomId, roomName, roomType) {
         this.currentRoomId = roomId;
         this.currentRoomType = roomType;
         this.typingIndicator.textContent = '';
         
+        // Reset thông tin người dùng khác
+        this.otherUserId = null;
+        this.otherUserName = null;
+        
+        // Nếu là direct chat, load thông tin người dùng khác ngay
+        if (roomType === 'direct') {
+            await this.loadOtherUserInfo(roomId);
+        }
+        
         // Hiển thị button sửa biệt danh cho direct chat
         if (this.editAliasBtn) {
-            if (roomType === 'direct') {
+            if (roomType === 'direct' && this.otherUserId) {
                 this.editAliasBtn.style.display = 'block';
             } else {
                 this.editAliasBtn.style.display = 'none';
-                this.otherUserId = null;
-                this.otherUserName = null;
             }
         }
         
@@ -541,11 +589,11 @@ class ChatManager {
             room_id: roomId
         });
         
-        // Load messages và lấy thông tin user khác nếu là direct chat
+        // Load messages
         await this.loadMessages(roomId);
         
         // Nếu là direct chat, hiển thị biệt danh thay vì tên phòng
-        if (roomType === 'direct' && this.otherUserId && this.otherUserName) {
+        if (roomType === 'direct' && this.otherUserName) {
             this.currentRoomNameElement.textContent = this.otherUserName;
         } else {
             this.currentRoomNameElement.textContent = roomName;
@@ -571,33 +619,6 @@ class ChatManager {
             if (messages.length === 0) {
                 this.messagesElement.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Hãy là người đầu tiên gửi tin nhắn!</p>';
             } else {
-                // Nếu là direct chat, lấy thông tin user khác và fetch alias
-                if (this.currentRoomType === 'direct') {
-                    const otherUserMessage = messages.find(msg => msg.sender_id !== currentUser.id);
-                    if (otherUserMessage) {
-                        this.otherUserId = otherUserMessage.sender_id;
-                        
-                        // Fetch alias từ API
-                        try {
-                            const aliasResponse = await fetch(`${CHAT_API_URL}/alias/${otherUserMessage.sender_id}`, {
-                                headers: {
-                                    'Authorization': `Bearer ${currentToken}`
-                                }
-                            });
-                            
-                            if (aliasResponse.ok) {
-                                const aliasData = await aliasResponse.json();
-                                this.otherUserName = aliasData.alias;
-                            } else {
-                                this.otherUserName = otherUserMessage.sender_username;
-                            }
-                        } catch (error) {
-                            console.error('Error fetching alias:', error);
-                            this.otherUserName = otherUserMessage.sender_username;
-                        }
-                    }
-                }
-                
                 messages.forEach(msg => this.renderMessage(msg, false));
                 this.scrollToBottom();
             }
