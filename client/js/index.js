@@ -369,13 +369,30 @@ class ChatManager {
                 
             case 'room_created':
                 console.log('New room created:', data.room);
-                // Thêm room mới vào đầu danh sách
-                this.rooms.unshift(data.room);
-                await this.renderRoomList();
-                // Tự động chọn room mới (chỉ nếu user hiện tại là người tạo)
+                // Kiểm tra xem room đã tồn tại trong danh sách chưa
+                const existingRoomIndex = this.rooms.findIndex(r => r.id === data.room.id);
+                if (existingRoomIndex === -1) {
+                    // Chưa có, thêm room mới vào đầu danh sách
+                    this.rooms.unshift(data.room);
+                    await this.renderRoomList();
+                }
+                // Tự động chọn room (chỉ nếu user hiện tại là người tạo)
                 if (data.creator_id === currentUser.id) {
                     this.selectRoom(data.room.id, data.room.name, data.room.type);
                 }
+                break;
+                
+            case 'room_found':
+                console.log('Found existing room:', data.room);
+                // Phòng đã tồn tại, kiểm tra xem có trong danh sách chưa
+                const foundRoomIndex = this.rooms.findIndex(r => r.id === data.room.id);
+                if (foundRoomIndex === -1) {
+                    // Chưa có trong danh sách, thêm vào
+                    this.rooms.unshift(data.room);
+                    await this.renderRoomList();
+                }
+                // Tự động mở phòng đã tồn tại
+                this.selectRoom(data.room.id, data.room.name, data.room.type);
                 break;
                 
             case 'room_joined':
@@ -746,18 +763,7 @@ class ChatManager {
         
         const selectedUser = users[index];
         
-        // Kiểm tra xem đã có direct chat chưa
-        const existingRoom = this.rooms.find(room => 
-            room.type === 'direct' && 
-            (room.name.includes(selectedUser.username) || room.name.includes(currentUser.username))
-        );
-        
-        if (existingRoom) {
-            this.selectRoom(existingRoom.id, existingRoom.name);
-            return;
-        }
-        
-        // Tạo direct chat mới
+        // Backend sẽ xử lý logic check trùng và trả về phòng cũ nếu đã tồn tại
         await this.createDirectRoom(selectedUser);
     }
     

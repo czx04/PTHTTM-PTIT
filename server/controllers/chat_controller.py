@@ -76,52 +76,73 @@ class ChatController:
             user_id = self._verify_token(authorization)
             print(f"User ID: {user_id}")
             
-            # Tạo room
-            print(f"Creating room in DAO...")
-            new_room = chat_room_dao.create(room_data)
-            print(f"New room created: {new_room}")
+            is_existing = False
+            
+            # Nếu là direct chat, kiểm tra xem đã có phòng giữa 2 người này chưa
+            if room_data.type == "direct" and room_data.participant_ids and len(room_data.participant_ids) == 2:
+                existing_room = chat_room_dao.get_direct_room(
+                    room_data.participant_ids[0],
+                    room_data.participant_ids[1]
+                )
+                if existing_room:
+                    print(f"✓ Found existing direct room: {existing_room.id}")
+                    new_room = existing_room
+                    is_existing = True
+                else:
+                    print(f"Creating new direct room...")
+                    new_room = chat_room_dao.create(room_data)
+                    if new_room:
+                        print(f"✓ New room created: {new_room.id}")
+            else:
+                # Tạo room mới (group chat hoặc trường hợp khác)
+                print(f"Creating room in DAO...")
+                new_room = chat_room_dao.create(room_data)
+                print(f"New room created: {new_room}")
+            
             if not new_room:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to create room"
                 )
             
-            # Thêm admin vào room
-            admin_participant = ChatParticipantCreate(
-                user_id=room_data.admin_id,
-                chat_room_id=new_room.id
-            )
-            chat_participant_dao.create(admin_participant)
-            
-            # Xử lý participant_ids nếu có
-            if room_data.participant_ids:
-                # Nếu là direct chat, tạo alias mặc định
-                if room_data.type == "direct" and len(room_data.participant_ids) == 2:
-                    user1_id, user2_id = room_data.participant_ids
-                    
-                    # Lấy usernames
-                    user1 = user_dao.get_by_id(user1_id)
-                    user2 = user_dao.get_by_id(user2_id)
-                    
-                    if user1 and user2:
-                        # Tạo alias mặc định (tên của người kia)
-                        alias_dao.create_or_update(user1_id, user2_id, user2.username)
-                        alias_dao.create_or_update(user2_id, user1_id, user1.username)
+            # Chỉ thêm participants nếu là phòng mới
+            if not is_existing:
+                # Thêm admin vào room
+                admin_participant = ChatParticipantCreate(
+                    user_id=room_data.admin_id,
+                    chat_room_id=new_room.id
+                )
+                chat_participant_dao.create(admin_participant)
                 
-                # Thêm các participants khác (trừ admin vì đã add rồi)
-                for participant_id in room_data.participant_ids:
-                    if participant_id != room_data.admin_id:
-                        participant = ChatParticipantCreate(
-                            user_id=participant_id,
-                            chat_room_id=new_room.id
-                        )
-                        chat_participant_dao.create(participant)
+                # Xử lý participant_ids nếu có
+                if room_data.participant_ids:
+                    # Nếu là direct chat, tạo alias mặc định
+                    if room_data.type == "direct" and len(room_data.participant_ids) == 2:
+                        user1_id, user2_id = room_data.participant_ids
+                        
+                        # Lấy usernames
+                        user1 = user_dao.get_by_id(user1_id)
+                        user2 = user_dao.get_by_id(user2_id)
+                        
+                        if user1 and user2:
+                            # Tạo alias mặc định (tên của người kia)
+                            alias_dao.create_or_update(user1_id, user2_id, user2.username)
+                            alias_dao.create_or_update(user2_id, user1_id, user1.username)
+                    
+                    # Thêm các participants khác (trừ admin vì đã add rồi)
+                    for participant_id in room_data.participant_ids:
+                        if participant_id != room_data.admin_id:
+                            participant = ChatParticipantCreate(
+                                user_id=participant_id,
+                                chat_room_id=new_room.id
+                            )
+                            chat_participant_dao.create(participant)
             
-            # Lấy danh sách participants để broadcast
+            # Lấy danh sách participants
             participants = chat_participant_dao.get_user_ids_in_room(new_room.id)
             participant_count = len(participants)
             
-            # Broadcast room_created event đến tất cả participants
+            # Tạo response
             room_response = ChatRoomResponse(
                 id=new_room.id,
                 name=new_room.name,
@@ -131,9 +152,26 @@ class ChatController:
                 participant_count=participant_count
             )
             
-            for participant_id in participants:
+            # Chỉ broadcast khi tạo phòng mới, không broadcast khi tìm thấy phòng cũ
+            if not is_existing:
+                for participant_id in participants:
+                    await ws_manager.send_personal_message({
+                        "type": "room_created",
+                        "room": {
+                            "id": room_response.id,
+                            "name": room_response.name,
+                            "type": room_response.type,
+                            "create_at": room_response.create_at.isoformat(),
+                            "admin_id": room_response.admin_id,
+                            "participant_count": room_response.participant_count
+                        },
+                        "creator_id": user_id,
+                        "is_new": True
+                    }, participant_id)
+            else:
+                # Phòng đã tồn tại, chỉ gửi cho người request
                 await ws_manager.send_personal_message({
-                    "type": "room_created",
+                    "type": "room_found",
                     "room": {
                         "id": room_response.id,
                         "name": room_response.name,
@@ -142,8 +180,8 @@ class ChatController:
                         "admin_id": room_response.admin_id,
                         "participant_count": room_response.participant_count
                     },
-                    "creator_id": user_id
-                }, participant_id)
+                    "is_new": False
+                }, user_id)
             
             return room_response
         except HTTPException:
