@@ -120,10 +120,9 @@
               >)
             </p>
           </div>
-          <div class="auth-status online" id="auth-status">
-            <div class="status-dot"></div>
-            <span>Đã xác thực</span>
-          </div>
+          <button class="logout-btn" onclick="handleLogout()" style="margin: 0">
+            Đăng Xuất
+          </button>
         </div>
 
         <div class="dashboard-content">
@@ -148,9 +147,6 @@
                 </div>
               </div>
             </div>
-            <button class="logout-btn" onclick="handleLogout()">
-              Đăng Xuất
-            </button>
           </div>
 
           <div class="card feature-card" id="feature-card">
@@ -249,6 +245,40 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal chọn người dùng -->
+    <div id="user-select-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">Chọn người để chat</h3>
+          <button class="modal-close" onclick="closeUserSelectModal()">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <input
+            type="text"
+            id="user-search"
+            class="search-input"
+            placeholder="🔍 Tìm kiếm người dùng..."
+          />
+          <div id="user-list" class="user-list">
+            <!-- Danh sách user sẽ được render ở đây -->
+          </div>
+        </div>
+        <div class="modal-footer" id="modal-footer" style="display: none">
+          <input
+            type="text"
+            id="group-name-input"
+            placeholder="Nhập tên nhóm..."
+            class="group-name-input"
+          />
+          <button class="btn btn-primary" onclick="createGroupFromModal()">
+            Tạo Nhóm
+          </button>
         </div>
       </div>
     </div>

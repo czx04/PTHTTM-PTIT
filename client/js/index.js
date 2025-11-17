@@ -11,7 +11,6 @@ let chatManager = null;
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
 const dashboard = document.getElementById('dashboard');
-const authStatus = document.getElementById('auth-status');
 
 // ===== UTILITY FUNCTIONS =====
 
@@ -96,14 +95,10 @@ function showDashboard(user) {
     const avatarLarge = document.getElementById('user-avatar');
     avatarLarge.textContent = user.username.charAt(0).toUpperCase();
     
-    // Update auth status
-    authStatus.classList.remove('offline');
-    authStatus.classList.add('online');
-    authStatus.innerHTML = '<div class="status-dot"></div><span>Đã xác thực</span>';
-    
     // Initialize chat
     if (!chatManager) {
         chatManager = new ChatManager();
+        window.chatManager = chatManager; // Store globally for modal access
     }
 }
 
@@ -276,8 +271,49 @@ document.getElementById('register-phone').addEventListener('keypress', (e) => {
     }
 });
 
+// Modal event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Close modal on overlay click
+    const modal = document.getElementById('user-select-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal && window.chatManager) {
+                window.chatManager.closeUserSelectModal();
+            }
+        });
+    }
+    
+    // Search functionality
+    const searchInput = document.getElementById('user-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            if (window.chatManager && window.chatManager.allUsers) {
+                const searchTerm = e.target.value.toLowerCase();
+                const filtered = window.chatManager.allUsers.filter(user =>
+                    user.username.toLowerCase().includes(searchTerm)
+                );
+                window.chatManager.renderUserList(filtered);
+            }
+        });
+    }
+});
+
 // Initialize app on page load
 initializeApp();
+
+// ===== GLOBAL MODAL FUNCTIONS =====
+
+function closeUserSelectModal() {
+    if (window.chatManager) {
+        window.chatManager.closeUserSelectModal();
+    }
+}
+
+function createGroupFromModal() {
+    if (window.chatManager) {
+        window.chatManager.createGroupFromModal();
+    }
+}
 
 // ===== CHAT MANAGER CLASS =====
 
@@ -767,62 +803,125 @@ class ChatManager {
             return;
         }
         
-        // Tạo dialog chọn user
-        let userList = 'Chọn người để chat:\n\n';
-        users.forEach((user, index) => {
-            userList += `${index + 1}. ${user.username}\n`;
-        });
-        
-        const choice = prompt(userList + '\nNhập số thứ tự:');
-        if (!choice) return;
-        
-        const index = parseInt(choice) - 1;
-        if (index < 0 || index >= users.length) {
-            alert('Lựa chọn không hợp lệ');
-            return;
-        }
-        
-        const selectedUser = users[index];
-        
-        // Backend sẽ xử lý logic check trùng và trả về phòng cũ nếu đã tồn tại
-        await this.createDirectRoom(selectedUser);
+        this.openUserSelectModal('direct', users);
     }
     
     async showCreateGroupChatDialog() {
-        const roomName = prompt('Nhập tên nhóm chat:');
-        if (!roomName || !roomName.trim()) return;
-        
-        // Lấy danh sách users
         const users = await this.loadAllUsers();
         if (users.length === 0) {
             alert('Không có người dùng nào để thêm vào nhóm');
             return;
         }
         
-        // Tạo dialog chọn nhiều users
-        let userList = 'Chọn thành viên cho nhóm (nhập số cách nhau bằng dấu phẩy, ví dụ: 1,2,3):\n\n';
-        users.forEach((user, index) => {
-            userList += `${index + 1}. ${user.username}\n`;
-        });
+        this.openUserSelectModal('group', users);
+    }
+    
+    openUserSelectModal(mode, users) {
+        this.modalMode = mode;
+        this.allUsers = users;
+        this.selectedUserIds = [];
         
-        const choice = prompt(userList + '\nNhập số thứ tự (hoặc bỏ qua để tạo nhóm trống):');
+        const modal = document.getElementById('user-select-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const footer = document.getElementById('modal-footer');
+        const searchInput = document.getElementById('user-search');
         
-        let selectedUserIds = [currentUser.id]; // Admin luôn là thành viên
-        
-        if (choice && choice.trim()) {
-            const indices = choice.split(',').map(s => parseInt(s.trim()) - 1);
-            
-            for (const index of indices) {
-                if (index >= 0 && index < users.length) {
-                    const userId = users[index].id;
-                    if (!selectedUserIds.includes(userId)) {
-                        selectedUserIds.push(userId);
-                    }
-                }
-            }
+        if (mode === 'direct') {
+            modalTitle.textContent = '💬 Chọn người để chat';
+            footer.style.display = 'none';
+        } else {
+            modalTitle.textContent = '👥 Tạo nhóm chat';
+            footer.style.display = 'flex';
+            document.getElementById('group-name-input').value = '';
         }
         
-        await this.createGroupRoom(roomName.trim(), selectedUserIds);
+        this.renderUserList(users);
+        modal.style.display = 'flex';
+        searchInput.value = '';
+        searchInput.focus();
+    }
+    
+    closeUserSelectModal() {
+        const modal = document.getElementById('user-select-modal');
+        modal.style.display = 'none';
+        this.selectedUserIds = [];
+        this.allUsers = [];
+        this.modalMode = null;
+    }
+    
+    renderUserList(users) {
+        const userListElement = document.getElementById('user-list');
+        userListElement.innerHTML = '';
+        
+        users.forEach(user => {
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.dataset.userId = user.id;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'user-avatar';
+            avatar.textContent = user.username.charAt(0).toUpperCase();
+            
+            const userInfo = document.createElement('div');
+            userInfo.className = 'user-info';
+            
+            const userName = document.createElement('div');
+            userName.className = 'user-name';
+            userName.textContent = user.username;
+            
+            userInfo.appendChild(userName);
+            userItem.appendChild(avatar);
+            userItem.appendChild(userInfo);
+            
+            if (this.modalMode === 'group') {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'user-checkbox';
+                userItem.appendChild(checkbox);
+            }
+            
+            userItem.addEventListener('click', () => this.handleUserSelect(user));
+            userListElement.appendChild(userItem);
+        });
+    }
+    
+    async handleUserSelect(user) {
+        if (this.modalMode === 'direct') {
+            // Direct chat: tạo ngay
+            this.closeUserSelectModal();
+            await this.createDirectRoom(user);
+        } else {
+            // Group chat: toggle selection
+            const userItem = document.querySelector(`[data-user-id="${user.id}"]`);
+            
+            if (this.selectedUserIds.includes(user.id)) {
+                this.selectedUserIds = this.selectedUserIds.filter(id => id !== user.id);
+                userItem.classList.remove('selected');
+            } else {
+                this.selectedUserIds.push(user.id);
+                userItem.classList.add('selected');
+            }
+        }
+    }
+    
+    async createGroupFromModal() {
+        const groupNameInput = document.getElementById('group-name-input');
+        const groupName = groupNameInput.value.trim();
+        
+        if (!groupName) {
+            alert('Vui lòng nhập tên nhóm');
+            groupNameInput.focus();
+            return;
+        }
+        
+        if (this.selectedUserIds.length === 0) {
+            alert('Vui lòng chọn ít nhất 1 thành viên');
+            return;
+        }
+        
+        this.closeUserSelectModal();
+        
+        const participantIds = [currentUser.id, ...this.selectedUserIds];
+        await this.createGroupRoom(groupName, participantIds);
     }
     
     async createDirectRoom(targetUser) {
