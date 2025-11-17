@@ -14,9 +14,6 @@ class UserDAO:
         self.table_name = "Users"
     
     def create(self, user_data: UserCreate) -> Optional[User]:
-        """
-        Tạo user mới
-        """
         try:
             user_id = str(uuid.uuid4())
             hashed_password = security_utils.hash_password(user_data.password)
@@ -35,9 +32,17 @@ class UserDAO:
                     user_data.avt_url
                 ))
                 
-                return self.get_by_id(user_id)
+                return User(
+                    id=user_id,
+                    username=user_data.username,
+                    password=hashed_password,
+                    phone=user_data.phone,
+                    avt_url=user_data.avt_url
+                )
         except Exception as e:
             print(f"Error creating user: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_by_id(self, user_id: str) -> Optional[User]:
